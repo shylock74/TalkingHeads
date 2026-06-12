@@ -305,13 +305,12 @@ struct THSceneEditorView: View {
 
 					if scene.audioSequence != nil {
 						Button {
-							// Phase 3: THAudioAnalyzer will handle this
+							runTranscription ()
 						} label: {
 							Label ("Run Transcription", systemImage: "play.fill")
 						}
 						.buttonStyle (.borderedProminent)
 						.controlSize (.small)
-						.disabled (true) // Enabled in Slice 2
 					}
 				}
 			}
@@ -629,5 +628,148 @@ struct THSceneEditorView: View {
 				}
 			}
 		}
+	}
+	
+	private func runTranscription () {
+		guard let audioSeq = scene.audioSequence else { return }
+		
+		guard let currentDoc = NSDocumentController.shared.currentDocument,
+			  let projectURL = currentDoc.fileURL else {
+			return
+		}
+		
+		let audioURL = THFileUtils.resolveAssetPath (audioSeq.audioFilePath, projectURL: projectURL)
+		
+		isAnalyzingAudio = true
+		analysisStatus = "Initializing ASR models..."
+		
+		Task {
+			do {
+				// 1. Download and load ASR models (tdtCtc110m is compact and runs perfectly)
+				let models = try await AsrModels.downloadAndLoad (
+					version: .tdtCtc110m
+				)
+				
+				await MainActor.run {
+					analysisStatus = "Transcribing audio content..."
+				}
+				
+				// 2. Transcribe
+				let asrManager = AsrManager (config: .default, models: models)
+				var decoderState = TdtDecoderState.make (decoderLayers: models.version.decoderLayers)
+				
+				let asrResult = try await asrManager.transcribe (audioURL, decoderState: &decoderState)
+				
+				await MainActor.run {
+					analysisStatus = "Segmenting text into sentences..."
+				}
+				
+				// 3. Segment into sentences
+				let tokenTimings = asrResult.tokenTimings ?? []
+				let transcript = segmentTranscript (from: tokenTimings, fallbackText: asrResult.text)
+				
+				await MainActor.run {
+					scene.transcript = transcript
+					scene.modifiedAt = Date ()
+					isAnalyzingAudio = false
+				}
+			} catch {
+				await MainActor.run {
+					print ("Transcription failed: \(error.localizedDescription)")
+					isAnalyzingAudio = false
+				}
+			}
+		}
+	}
+	
+	private func segmentTranscript (from timings: [TokenTiming], fallbackText: String) -> THTranscript {
+		guard !timings.isEmpty else {
+			// Fallback text splitter if timings are missing
+			var sentences: [THSentence] = []
+			let rawSentences = fallbackText.components (separatedBy: CharacterSet (charactersIn: ".!?"))
+			var lastTime = 0.0
+			for raw in rawSentences {
+				let trimmed = raw.trimmingCharacters (in: .whitespacesAndNewlines)
+				if !trimmed.isEmpty {
+					let duration = Double (trimmed.split (separator: " ").count) * 0.4
+					let endTime = lastTime + duration
+					sentences.append (THSentence (
+						text: trimmed,
+						startTime: lastTime,
+						endTime: endTime,
+						punctuation: .period
+					))
+					lastTime = endTime
+				}
+			}
+			return THTranscript (fullText: fallbackText, sentences: sentences)
+		}
+		
+		var sentences: [THSentence] = []
+		var currentTokens: [TokenTiming] = []
+		
+		for timing in timings {
+			currentTokens.append (timing)
+			
+			// Clean token text to detect punctuation
+			let cleanToken = timing.token
+				.replacingOccurrences (of: "\u{2581}", with: " ")
+				.trimmingCharacters (in: .whitespacesAndNewlines)
+			
+			// Check if it ends with a sentence break
+			var foundBreak: THPunctuation? = nil
+			if cleanToken.hasSuffix ("...") {
+				foundBreak = .ellipsis
+			} else if cleanToken.hasSuffix (".") {
+				foundBreak = .period
+			} else if cleanToken.hasSuffix ("!") {
+				foundBreak = .exclamation
+			} else if cleanToken.hasSuffix ("?") {
+				foundBreak = .question
+			} else if cleanToken.hasSuffix (":") {
+				foundBreak = .colon
+			} else if cleanToken.hasSuffix (";") {
+				foundBreak = .semicolon
+			}
+			
+			if let punc = foundBreak {
+				// Flush current sentence
+				let text = currentTokens.map { $0.token }
+					.joined ()
+					.replacingOccurrences (of: "\u{2581}", with: " ")
+					.trimmingCharacters (in: .whitespacesAndNewlines)
+				
+				if let firstToken = currentTokens.first {
+					let sentence = THSentence (
+						text: text,
+						startTime: firstToken.startTime,
+						endTime: timing.endTime,
+						punctuation: punc
+					)
+					sentences.append (sentence)
+				}
+				currentTokens.removeAll ()
+			}
+		}
+		
+		// Flush remaining
+		if !currentTokens.isEmpty {
+			let text = currentTokens.map { $0.token }
+				.joined ()
+				.replacingOccurrences (of: "\u{2581}", with: " ")
+				.trimmingCharacters (in: .whitespacesAndNewlines)
+			if let firstToken = currentTokens.first, let lastToken = currentTokens.last {
+				let sentence = THSentence (
+					text: text,
+					startTime: firstToken.startTime,
+					endTime: lastToken.endTime,
+					punctuation: .none
+				)
+				sentences.append (sentence)
+			}
+		}
+		
+		let fullText = sentences.map { $0.text }.joined (separator: " ")
+		return THTranscript (fullText: fullText, sentences: sentences)
 	}
 }
