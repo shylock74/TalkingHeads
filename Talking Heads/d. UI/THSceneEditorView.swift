@@ -350,6 +350,25 @@ struct THSceneEditorView: View {
 							.font (.body)
 					}
 					
+					let projectURL = NSDocumentController.shared.currentDocument?.fileURL
+					
+					THShotGalleryView (
+						shots: sceneShots,
+						projectURL: projectURL,
+						onApprove: { shotId, isApproved in
+							if let idx = document.projectState.shots.firstIndex (where: { $0.id == shotId }) {
+								document.projectState.shots [idx].isApproved = isApproved
+								scene.modifiedAt = Date ()
+							}
+						},
+						onDelete: { shotId in
+							scene.shotIds.removeAll { $0 == shotId }
+							document.projectState.shots.removeAll { $0.id == shotId }
+							scene.modifiedAt = Date ()
+						}
+					)
+					.frame (minHeight: 220)
+					
 					HStack {
 						Button {
 							generateShots ()

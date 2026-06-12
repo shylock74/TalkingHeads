@@ -15,6 +15,7 @@ import UMUIControls
 /// Placeholder for Slice 3 — currently shows the shell with no generation capability.
 struct THShotGalleryView: View {
 	let shots: [THShot]
+	let projectURL: URL?
 	let onApprove: (UUID, Bool) -> Void
 	let onDelete: (UUID) -> Void
 
@@ -48,20 +49,18 @@ struct THShotGalleryView: View {
 					.aspectRatio (16 / 9, contentMode: .fit)
 
 				if let mainPath = shot.variants.mouthClosedEyesOpen,
-				   let nsImage = NSImage (contentsOfFile: mainPath) {
-					Image (nsImage: nsImage)
-						.resizable ()
-						.aspectRatio (contentMode: .fill)
-						.clipShape (RoundedRectangle (cornerRadius: 10))
-				} else {
-					VStack (spacing: 4) {
-						Image (systemName: "camera")
-							.font (.title2)
-							.foregroundStyle (.quaternary)
-						Text (shot.shotType.abbreviation)
-							.font (.caption.bold ())
-							.foregroundStyle (.tertiary)
+				   let url = projectURL {
+					let absoluteURL = THFileUtils.resolveAssetPath (mainPath, projectURL: url)
+					if let nsImage = NSImage (contentsOfFile: absoluteURL.path) {
+						Image (nsImage: nsImage)
+							.resizable ()
+							.aspectRatio (contentMode: .fill)
+							.clipShape (RoundedRectangle (cornerRadius: 10))
+					} else {
+						placeholderView (shot)
 					}
+				} else {
+					placeholderView (shot)
 				}
 			}
 			.overlay (alignment: .topLeading) {
@@ -135,5 +134,17 @@ struct THShotGalleryView: View {
 		}
 		.frame (maxWidth: .infinity, maxHeight: .infinity)
 		.padding (40)
+	}
+
+	@ViewBuilder
+	private func placeholderView (_ shot: THShot) -> some View {
+		VStack (spacing: 4) {
+			Image (systemName: "camera")
+				.font (.title2)
+				.foregroundStyle (.quaternary)
+			Text (shot.shotType.abbreviation)
+				.font (.caption.bold ())
+				.foregroundStyle (.tertiary)
+		}
 	}
 }
