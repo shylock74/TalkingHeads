@@ -70,6 +70,62 @@ nonisolated struct THScene: Codable, Identifiable, Sendable, Hashable {
 	var createdAt: Date
 	var modifiedAt: Date
  
+	enum CodingKeys: String, CodingKey {
+		case id
+		case name
+		case characterId
+		case environmentId
+		case aspectRatio
+		case characterPosition
+		case cameraSetup
+		case audioSequence
+		case transcript
+		case shotIds
+		case shotAssignments
+		case renderedVideoPath
+		case createdAt
+		case modifiedAt
+	}
+
+	init (from decoder: Decoder) throws {
+		let container = try decoder.container (keyedBy: CodingKeys.self)
+		id = try container.decode (UUID.self, forKey: .id)
+		name = try container.decode (String.self, forKey: .name)
+		characterId = try container.decode (UUID.self, forKey: .characterId)
+		environmentId = try container.decode (UUID.self, forKey: .environmentId)
+		
+		// Fallbacks for migration
+		aspectRatio = (try? container.decode (THAspectRatio.self, forKey: .aspectRatio)) ?? .ar_16_9
+		characterPosition = (try? container.decode (String.self, forKey: .characterPosition)) ?? ""
+		cameraSetup = (try? container.decode (String.self, forKey: .cameraSetup)) ?? ""
+		
+		audioSequence = try container.decodeIfPresent (THAudioSequence.self, forKey: .audioSequence)
+		transcript = try container.decodeIfPresent (THTranscript.self, forKey: .transcript)
+		shotIds = (try? container.decode ([UUID].self, forKey: .shotIds)) ?? []
+		shotAssignments = (try? container.decode ([THShotAssignment].self, forKey: .shotAssignments)) ?? []
+		renderedVideoPath = try container.decodeIfPresent (String.self, forKey: .renderedVideoPath)
+		createdAt = (try? container.decode (Date.self, forKey: .createdAt)) ?? Date ()
+		modifiedAt = (try? container.decode (Date.self, forKey: .modifiedAt)) ?? Date ()
+	}
+
+	func encode (to encoder: Encoder) throws {
+		var container = encoder.container (keyedBy: CodingKeys.self)
+		try container.encode (id, forKey: .id)
+		try container.encode (name, forKey: .name)
+		try container.encode (characterId, forKey: .characterId)
+		try container.encode (environmentId, forKey: .environmentId)
+		try container.encode (aspectRatio, forKey: .aspectRatio)
+		try container.encode (characterPosition, forKey: .characterPosition)
+		try container.encode (cameraSetup, forKey: .cameraSetup)
+		try container.encodeIfPresent (audioSequence, forKey: .audioSequence)
+		try container.encodeIfPresent (transcript, forKey: .transcript)
+		try container.encode (shotIds, forKey: .shotIds)
+		try container.encode (shotAssignments, forKey: .shotAssignments)
+		try container.encodeIfPresent (renderedVideoPath, forKey: .renderedVideoPath)
+		try container.encode (createdAt, forKey: .createdAt)
+		try container.encode (modifiedAt, forKey: .modifiedAt)
+	}
+
 	init (
 		id: UUID = UUID (),
 		name: String = "Untitled Scene",
