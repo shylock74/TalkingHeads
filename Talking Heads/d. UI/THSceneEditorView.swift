@@ -9,6 +9,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 import UMUIControls
 import AVFoundation
+import FluidAudio
 
 // MARK: - Scene Editor View
 
@@ -24,6 +25,9 @@ struct THSceneEditorView: View {
 	@State private var generationProgress: Double = 0.0
 	@State private var generationStatus = ""
 	@State private var generationError: String?
+
+	@State private var isAnalyzingAudio = false
+	@State private var analysisStatus = ""
 
 	var body: some View {
 		ScrollView {
@@ -66,6 +70,27 @@ struct THSceneEditorView: View {
 							.font (.caption)
 							.foregroundStyle (.secondary)
 							.multilineTextAlignment (.center)
+					}
+					.padding (24)
+					.background (.background)
+					.clipShape (RoundedRectangle (cornerRadius: 16))
+					.shadow (radius: 10)
+				}
+			} else if isAnalyzingAudio {
+				ZStack {
+					Color.black.opacity (0.4)
+						.ignoresSafeArea ()
+					
+					VStack (spacing: 16) {
+						ProgressView ()
+							.progressViewStyle (.circular)
+						
+						Text (analysisStatus)
+							.font (.headline)
+						
+						Text ("Analyzing audio file with CoreML Silero VAD...")
+							.font (.caption)
+							.foregroundStyle (.secondary)
 					}
 					.padding (24)
 					.background (.background)
@@ -417,34 +442,98 @@ struct THSceneEditorView: View {
 		}
 		
 		let gotAccess = url.startAccessingSecurityScopedResource ()
-		defer {
-			if gotAccess {
-				url.stopAccessingSecurityScopedResource ()
-			}
-		}
 		
-		do {
-			// Copy the audio file into the project bundle folder 'audio'
-			let relativePath = try THFileUtils.copyIntoProject (source: url, subdirectory: "audio", projectURL: projectURL)
+		isAnalyzingAudio = true
+		analysisStatus = "Importing audio file..."
+		
+		Task {
+			defer {
+				if gotAccess {
+					url.stopAccessingSecurityScopedResource ()
+				}
+			}
 			
-			// Resolve the copied absolute path to extract duration
-			let destURL = THFileUtils.resolveAssetPath (relativePath, projectURL: projectURL)
-			let asset = AVURLAsset (url: destURL)
-			let seconds = CMTimeGetSeconds (asset.duration)
-			let duration = seconds.isNaN ? 0.0 : seconds
-			
-			scene.audioSequence = THAudioSequence (
-				audioFilePath: relativePath,
-				duration: duration,
-				segments: [],
-				clusters: []
-			)
-			scene.transcript = nil
-			scene.shotAssignments = []
-			scene.renderedVideoPath = nil
-			scene.modifiedAt = Date ()
-		} catch {
-			print ("Audio import failed: \(error.localizedDescription)")
+			do {
+				// Copy the audio file into the project bundle folder 'audio'
+				let relativePath = try THFileUtils.copyIntoProject (source: url, subdirectory: "audio", projectURL: projectURL)
+				
+				// Resolve the copied absolute path to extract duration
+				let destURL = THFileUtils.resolveAssetPath (relativePath, projectURL: projectURL)
+				let asset = AVURLAsset (url: destURL)
+				let durationCMTime = try await asset.load (.duration)
+				let seconds = CMTimeGetSeconds (durationCMTime)
+				let duration = seconds.isNaN ? 0.0 : seconds
+				
+				// 1. Resample audio
+				await MainActor.run {
+					analysisStatus = "Resampling audio to 16kHz..."
+				}
+				let converter = AudioConverter ()
+				let samples = try converter.resampleAudioFile (destURL)
+				
+				// 2. Initialize VadManager
+				await MainActor.run {
+					analysisStatus = "Initializing VAD Model..."
+				}
+				let vadManager = try await VadManager ()
+				
+				// 3. Process VAD
+				await MainActor.run {
+					analysisStatus = "Running Voice Activity Detection..."
+				}
+				let vadResults = try await vadManager.process (samples)
+				
+				// 4. Segment Speech
+				await MainActor.run {
+					analysisStatus = "Segmenting speech clusters..."
+				}
+				let segments = await vadManager.segmentSpeech (from: vadResults, totalSamples: samples.count)
+				
+				// Map FluidAudio's VadResult/VadSegment to our THAudioSegment and THSpeechCluster
+				var thSegments: [THAudioSegment] = []
+				for (index, res) in vadResults.enumerated () {
+					let startTime = Double (index * VadManager.chunkSize) / Double (VadManager.sampleRate)
+					let endTime = Double ((index + 1) * VadManager.chunkSize) / Double (VadManager.sampleRate)
+					let thSeg = THAudioSegment (
+						startTime: startTime,
+						endTime: min (endTime, duration),
+						isSpeech: res.isVoiceActive
+					)
+					thSegments.append (thSeg)
+				}
+				
+				var thClusters: [THSpeechCluster] = []
+				for seg in segments {
+					let clusterSegments = thSegments.filter {
+						$0.startTime >= seg.startTime && $0.endTime <= seg.endTime
+					}
+					let cluster = THSpeechCluster (
+						startTime: seg.startTime,
+						endTime: min (seg.endTime, duration),
+						segments: clusterSegments
+					)
+					thClusters.append (cluster)
+				}
+				
+				await MainActor.run {
+					scene.audioSequence = THAudioSequence (
+						audioFilePath: relativePath,
+						duration: duration,
+						segments: thSegments,
+						clusters: thClusters
+					)
+					scene.transcript = nil
+					scene.shotAssignments = []
+					scene.renderedVideoPath = nil
+					scene.modifiedAt = Date ()
+					isAnalyzingAudio = false
+				}
+			} catch {
+				await MainActor.run {
+					print ("Audio analysis failed: \(error.localizedDescription)")
+					isAnalyzingAudio = false
+				}
+			}
 		}
 	}
 	
