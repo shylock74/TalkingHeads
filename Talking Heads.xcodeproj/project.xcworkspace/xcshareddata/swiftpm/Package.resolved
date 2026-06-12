@@ -1,0 +1,42 @@
+{
+  "originHash" : "c649f86a90d9a63d5f27210605ba295b5779a6c392b7c20c657ee8ed3680620d",
+  "pins" : [
+    {
+      "identity" : "fluidaudio",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/FluidInference/FluidAudio.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "162e6918ef500fe5f99eebdb1b442cf772713afb"
+      }
+    },
+    {
+      "identity" : "umaudiowaveform",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/shylock74/UMAudioWaveform",
+      "state" : {
+        "branch" : "main",
+        "revision" : "0dafc3a0b85e04b069cd25ee0d81699fba2bae71"
+      }
+    },
+    {
+      "identity" : "umprogresslib",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/shylock74/UMProgressLib",
+      "state" : {
+        "branch" : "main",
+        "revision" : "36f0f326eb648518fd271cbbe7423c3431b35a1d"
+      }
+    },
+    {
+      "identity" : "umuicontrols",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/shylock74/UMUIControls",
+      "state" : {
+        "branch" : "main",
+        "revision" : "a514f26807420b60c2a28c385e28e8f62e4f2825"
+      }
+    }
+  ],
+  "version" : 3
+}

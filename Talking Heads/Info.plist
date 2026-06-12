@@ -9,28 +9,30 @@
 			<string>Editor</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>com.example.plain-text</string>
+				<string>media.ulti.thproject</string>
 			</array>
+			<key>LSTypeIsPackage</key>
+			<true/>
 			<key>NSUbiquitousDocumentUserActivityType</key>
-			<string>$(PRODUCT_BUNDLE_IDENTIFIER).exampledocument</string>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER).thproject</string>
 		</dict>
 	</array>
-	<key>UTImportedTypeDeclarations</key>
+	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>
 			<key>UTTypeConformsTo</key>
 			<array>
-				<string>public.plain-text</string>
+				<string>com.apple.package</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>Example Text</string>
+			<string>TalkingHeads Project</string>
 			<key>UTTypeIdentifier</key>
-			<string>com.example.plain-text</string>
+			<string>media.ulti.thproject</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>
 				<array>
-					<string>exampletext</string>
+					<string>thproject</string>
 				</array>
 			</dict>
 		</dict>

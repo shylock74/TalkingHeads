@@ -6,6 +6,15 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		87DD06002FDBED40001461AD /* UMAudioWaveform in Frameworks */ = {isa = PBXBuildFile; productRef = 87DD05FF2FDBED40001461AD /* UMAudioWaveform */; };
+		87DD06032FDBED89001461AD /* UMUIControls in Frameworks */ = {isa = PBXBuildFile; productRef = 87DD06022FDBED89001461AD /* UMUIControls */; };
+		87DD06062FDBEDB2001461AD /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 87DD06052FDBEDB2001461AD /* FluidAudio */; };
+		87DD06092FDBEDD3001461AD /* UMVideoComposer in Frameworks */ = {isa = PBXBuildFile; productRef = 87DD06082FDBEDD3001461AD /* UMVideoComposer */; };
+		87DD061A2FDBEE23001461AD /* UMProgressLib in Frameworks */ = {isa = PBXBuildFile; productRef = 87DD06192FDBEE23001461AD /* UMProgressLib */; };
+		87DD06302FDBEE40001461AD /* UMGeminiLib in Frameworks */ = {isa = PBXBuildFile; productRef = 87DD062F2FDBEE40001461AD /* UMGeminiLib */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		87DD05EC2FDBECCE001461AD /* Talking Heads.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Talking Heads.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -36,6 +45,12 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				87DD06092FDBEDD3001461AD /* UMVideoComposer in Frameworks */,
+				87DD06032FDBED89001461AD /* UMUIControls in Frameworks */,
+				87DD06062FDBEDB2001461AD /* FluidAudio in Frameworks */,
+				87DD06002FDBED40001461AD /* UMAudioWaveform in Frameworks */,
+				87DD061A2FDBEE23001461AD /* UMProgressLib in Frameworks */,
+				87DD06302FDBEE40001461AD /* UMGeminiLib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +93,12 @@
 			);
 			name = "Talking Heads";
 			packageProductDependencies = (
+				87DD05FF2FDBED40001461AD /* UMAudioWaveform */,
+				87DD06022FDBED89001461AD /* UMUIControls */,
+				87DD06052FDBEDB2001461AD /* FluidAudio */,
+				87DD06082FDBEDD3001461AD /* UMVideoComposer */,
+				87DD06192FDBEE23001461AD /* UMProgressLib */,
+				87DD062F2FDBEE40001461AD /* UMGeminiLib */,
 			);
 			productName = "Talking Heads";
 			productReference = 87DD05EC2FDBECCE001461AD /* Talking Heads.app */;
@@ -107,6 +128,14 @@
 			);
 			mainGroup = 87DD05E32FDBECCE001461AD;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				87DD05FE2FDBED40001461AD /* XCRemoteSwiftPackageReference "UMAudioWaveform" */,
+				87DD06012FDBED89001461AD /* XCRemoteSwiftPackageReference "UMUIControls" */,
+				87DD06042FDBEDB2001461AD /* XCRemoteSwiftPackageReference "FluidAudio" */,
+				87DD06072FDBEDD3001461AD /* XCLocalSwiftPackageReference "../UMVideoComposer" */,
+				87DD06182FDBEE23001461AD /* XCRemoteSwiftPackageReference "UMProgressLib" */,
+				87DD062E2FDBEE40001461AD /* XCLocalSwiftPackageReference "../UMGeminiLib" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 87DD05ED2FDBECCE001461AD /* Products */;
 			projectDirPath = "";
@@ -143,14 +172,20 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				AUTOMATION_APPLE_EVENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = MM8F6VU7HE;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readwrite;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Talking Heads/Info.plist";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -162,6 +197,12 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "media.ulti.Talking-Heads";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
+				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
+				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
+				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = NO;
+				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
+				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
+				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -176,14 +217,20 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				AUTOMATION_APPLE_EVENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = MM8F6VU7HE;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readwrite;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Talking Heads/Info.plist";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -195,6 +242,12 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "media.ulti.Talking-Heads";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
+				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
+				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
+				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = NO;
+				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
+				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
+				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -346,6 +399,84 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		87DD06072FDBEDD3001461AD /* XCLocalSwiftPackageReference "../UMVideoComposer" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../UMVideoComposer;
+		};
+		87DD062E2FDBEE40001461AD /* XCLocalSwiftPackageReference "../UMGeminiLib" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../UMGeminiLib;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		87DD05FE2FDBED40001461AD /* XCRemoteSwiftPackageReference "UMAudioWaveform" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/shylock74/UMAudioWaveform";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+		87DD06012FDBED89001461AD /* XCRemoteSwiftPackageReference "UMUIControls" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/shylock74/UMUIControls";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+		87DD06042FDBEDB2001461AD /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/FluidInference/FluidAudio.git";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+		87DD06182FDBEE23001461AD /* XCRemoteSwiftPackageReference "UMProgressLib" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/shylock74/UMProgressLib";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		87DD05FF2FDBED40001461AD /* UMAudioWaveform */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 87DD05FE2FDBED40001461AD /* XCRemoteSwiftPackageReference "UMAudioWaveform" */;
+			productName = UMAudioWaveform;
+		};
+		87DD06022FDBED89001461AD /* UMUIControls */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 87DD06012FDBED89001461AD /* XCRemoteSwiftPackageReference "UMUIControls" */;
+			productName = UMUIControls;
+		};
+		87DD06052FDBEDB2001461AD /* FluidAudio */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 87DD06042FDBEDB2001461AD /* XCRemoteSwiftPackageReference "FluidAudio" */;
+			productName = FluidAudio;
+		};
+		87DD06082FDBEDD3001461AD /* UMVideoComposer */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = UMVideoComposer;
+		};
+		87DD06192FDBEE23001461AD /* UMProgressLib */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 87DD06182FDBEE23001461AD /* XCRemoteSwiftPackageReference "UMProgressLib" */;
+			productName = UMProgressLib;
+		};
+		87DD062F2FDBEE40001461AD /* UMGeminiLib */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 87DD062E2FDBEE40001461AD /* XCLocalSwiftPackageReference "../UMGeminiLib" */;
+			productName = UMGeminiLib;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 87DD05E42FDBECCE001461AD /* Project object */;
 }
