@@ -68,6 +68,8 @@ nonisolated struct THShot: Codable, Identifiable, Sendable, Hashable {
 	var cameraAngle: String
 	var lensStyle: String
 	var compositionNotes: String
+	var cameraSetup: String
+	var characterPosition: String
 
 	// Generation metadata
 	var promptUsed: String
@@ -83,6 +85,24 @@ nonisolated struct THShot: Codable, Identifiable, Sendable, Hashable {
 	var createdAt: Date
 	var modifiedAt: Date
 
+	enum CodingKeys: String, CodingKey {
+		case id
+		case characterId
+		case environmentId
+		case shotType
+		case cameraAngle
+		case lensStyle
+		case compositionNotes
+		case cameraSetup
+		case characterPosition
+		case promptUsed
+		case seedValue
+		case variants
+		case isApproved
+		case createdAt
+		case modifiedAt
+	}
+
 	init (
 		id: UUID = UUID (),
 		characterId: UUID,
@@ -91,6 +111,8 @@ nonisolated struct THShot: Codable, Identifiable, Sendable, Hashable {
 		cameraAngle: String = "Front",
 		lensStyle: String = "Standard 50mm",
 		compositionNotes: String = "",
+		cameraSetup: String = "",
+		characterPosition: String = "",
 		promptUsed: String = "",
 		seedValue: Int? = nil,
 		variants: THShotVariants = .empty,
@@ -105,11 +127,51 @@ nonisolated struct THShot: Codable, Identifiable, Sendable, Hashable {
 		self.cameraAngle = cameraAngle
 		self.lensStyle = lensStyle
 		self.compositionNotes = compositionNotes
+		self.cameraSetup = cameraSetup
+		self.characterPosition = characterPosition
 		self.promptUsed = promptUsed
 		self.seedValue = seedValue
 		self.variants = variants
 		self.isApproved = isApproved
 		self.createdAt = createdAt
 		self.modifiedAt = modifiedAt
+	}
+
+	init (from decoder: Decoder) throws {
+		let container = try decoder.container (keyedBy: CodingKeys.self)
+		id = try container.decode (UUID.self, forKey: .id)
+		characterId = try container.decode (UUID.self, forKey: .characterId)
+		environmentId = try container.decode (UUID.self, forKey: .environmentId)
+		shotType = try container.decode (THShotType.self, forKey: .shotType)
+		cameraAngle = try container.decode (String.self, forKey: .cameraAngle)
+		lensStyle = try container.decode (String.self, forKey: .lensStyle)
+		compositionNotes = try container.decode (String.self, forKey: .compositionNotes)
+		cameraSetup = (try? container.decode (String.self, forKey: .cameraSetup)) ?? ""
+		characterPosition = (try? container.decode (String.self, forKey: .characterPosition)) ?? ""
+		promptUsed = try container.decode (String.self, forKey: .promptUsed)
+		seedValue = try container.decodeIfPresent (Int.self, forKey: .seedValue)
+		variants = try container.decode (THShotVariants.self, forKey: .variants)
+		isApproved = try container.decode (Bool.self, forKey: .isApproved)
+		createdAt = try container.decode (Date.self, forKey: .createdAt)
+		modifiedAt = try container.decode (Date.self, forKey: .modifiedAt)
+	}
+
+	func encode (to encoder: Encoder) throws {
+		var container = encoder.container (keyedBy: CodingKeys.self)
+		try container.encode (id, forKey: .id)
+		try container.encode (characterId, forKey: .characterId)
+		try container.encode (environmentId, forKey: .environmentId)
+		try container.encode (shotType, forKey: .shotType)
+		try container.encode (cameraAngle, forKey: .cameraAngle)
+		try container.encode (lensStyle, forKey: .lensStyle)
+		try container.encode (compositionNotes, forKey: .compositionNotes)
+		try container.encode (cameraSetup, forKey: .cameraSetup)
+		try container.encode (characterPosition, forKey: .characterPosition)
+		try container.encode (promptUsed, forKey: .promptUsed)
+		try container.encodeIfPresent (seedValue, forKey: .seedValue)
+		try container.encode (variants, forKey: .variants)
+		try container.encode (isApproved, forKey: .isApproved)
+		try container.encode (createdAt, forKey: .createdAt)
+		try container.encode (modifiedAt, forKey: .modifiedAt)
 	}
 }

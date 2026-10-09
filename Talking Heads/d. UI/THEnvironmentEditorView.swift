@@ -8,6 +8,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import UMUIControls
+import AppKit
 
 // MARK: - Environment Editor View
 
@@ -16,6 +17,11 @@ import UMUIControls
 struct THEnvironmentEditorView: View {
 	@Binding var environment: THEnvironment
 	@State private var isImportingImages = false
+	@State private var selectedImagePathForZoom: String? = nil
+
+	private var projectURL: URL? {
+		NSDocumentController.shared.currentDocument?.fileURL
+	}
 
 	var body: some View {
 		ScrollView {
@@ -37,6 +43,14 @@ struct THEnvironmentEditorView: View {
 			allowsMultipleSelection: true
 		) { result in
 			handleImageImport (result)
+		}
+		.sheet (isPresented: Binding<Bool> (
+			get: { selectedImagePathForZoom != nil },
+			set: { if !$0 { selectedImagePathForZoom = nil } }
+		)) {
+			if let path = selectedImagePathForZoom {
+				THImageZoomSheet (imagePath: path, projectURL: projectURL)
+			}
 		}
 	}
 
@@ -189,7 +203,18 @@ struct THEnvironmentEditorView: View {
 				.fill (Color.primary.opacity (0.05))
 				.frame (width: 80, height: 80)
 
-			if let nsImage = NSImage (contentsOfFile: path) {
+			// Attempt to load the image
+			let resolvedURL: URL = {
+				if path.hasPrefix ("/") {
+					return URL (fileURLWithPath: path)
+				} else if let projectURL = projectURL {
+					return THFileUtils.resolveAssetPath (path, projectURL: projectURL)
+				} else {
+					return URL (fileURLWithPath: path)
+				}
+			}()
+
+			if let nsImage = NSImage (contentsOf: resolvedURL) {
 				Image (nsImage: nsImage)
 					.resizable ()
 					.aspectRatio (contentMode: .fill)
@@ -199,6 +224,10 @@ struct THEnvironmentEditorView: View {
 				Image (systemName: "photo")
 					.foregroundStyle (.quaternary)
 			}
+		}
+		.contentShape (Rectangle ())
+		.onTapGesture {
+			selectedImagePathForZoom = path
 		}
 		.overlay (alignment: .topTrailing) {
 			Button {
@@ -218,7 +247,24 @@ struct THEnvironmentEditorView: View {
 	private func handleImageImport (_ result: Result<[URL], Error>) {
 		guard case .success (let urls) = result else { return }
 		for url in urls {
-			environment.referenceImagePaths.append (url.path)
+			let gotAccess = url.startAccessingSecurityScopedResource ()
+			
+			if let projectURL = projectURL {
+				do {
+					try THFileUtils.ensureDirectoryStructure (at: projectURL)
+					let relativePath = try THFileUtils.copyIntoProject (source: url, subdirectory: "environments", projectURL: projectURL)
+					environment.referenceImagePaths.append (relativePath)
+				} catch {
+					print ("Error copying image to project: \(error)")
+					environment.referenceImagePaths.append (url.path)
+				}
+			} else {
+				environment.referenceImagePaths.append (url.path)
+			}
+			
+			if gotAccess {
+				url.stopAccessingSecurityScopedResource ()
+			}
 		}
 		environment.modifiedAt = Date ()
 	}

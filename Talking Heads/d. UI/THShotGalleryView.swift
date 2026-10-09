@@ -19,6 +19,8 @@ struct THShotGalleryView: View {
 	let onApprove: (UUID, Bool) -> Void
 	let onDelete: (UUID) -> Void
 
+	@State private var selectedShotForZoom: THShot? = nil
+
 	private let columns = [
 		GridItem (.adaptive (minimum: 200, maximum: 300), spacing: 16)
 	]
@@ -34,6 +36,14 @@ struct THShotGalleryView: View {
 					}
 				}
 				.padding (16)
+			}
+		}
+		.sheet (isPresented: Binding<Bool> (
+			get: { selectedShotForZoom != nil },
+			set: { if !$0 { selectedShotForZoom = nil } }
+		)) {
+			if let shot = selectedShotForZoom {
+				THImageZoomSheet (shot: shot, projectURL: projectURL)
 			}
 		}
 	}
@@ -62,6 +72,10 @@ struct THShotGalleryView: View {
 				} else {
 					placeholderView (shot)
 				}
+			}
+			.contentShape (Rectangle ())
+			.onTapGesture {
+				selectedShotForZoom = shot
 			}
 			.overlay (alignment: .topLeading) {
 				Text (shot.shotType.displayName)

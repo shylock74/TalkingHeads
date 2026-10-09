@@ -10,6 +10,7 @@ import UniformTypeIdentifiers
 import UMUIControls
 import AVFoundation
 import FluidAudio
+import UMProgressLib
 
 // MARK: - Scene Editor View
 
@@ -19,15 +20,21 @@ import FluidAudio
 struct THSceneEditorView: View {
 	@Binding var scene: THScene
 	@Binding var document: Talking_HeadsDocument
+	let projectURL: URL?
+
+	private var resolvedProjectURL: URL? {
+		projectURL ?? NSDocumentController.shared.currentDocument?.fileURL
+	}
 
 	@State private var isImportingAudio = false
-	@State private var isGeneratingImages = false
-	@State private var generationProgress: Double = 0.0
-	@State private var generationStatus = ""
+	@State private var isShowingProgress = false
+	@State private var progressReport = UMProgressReport ()
+	@State private var activeTask: Task<Void, Never>? = nil
+	@State private var isShowingCreateShot = false
+
 	@State private var generationError: String?
 
-	@State private var isAnalyzingAudio = false
-	@State private var analysisStatus = ""
+	@State private var renderingError: String? = nil
 
 	var body: some View {
 		ScrollView {
@@ -35,10 +42,20 @@ struct THSceneEditorView: View {
 				apiKeyWarningBanner
 				headerSection
 				sceneInfoSection
-				audioPipelineSection
-				transcriptSection
-				shotPoolSection
-				renderSection
+				Grid (horizontalSpacing: 16, verticalSpacing: 16) {
+					GridRow {
+						audioPipelineSection
+							.frame (maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+						transcriptSection
+							.frame (maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+					}
+					GridRow {
+						shotPoolSection
+							.frame (maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+						renderSection
+							.frame (maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+					}
+				}
 			}
 			.padding (24)
 		}
@@ -50,53 +67,30 @@ struct THSceneEditorView: View {
 		) { result in
 			handleAudioImport (result)
 		}
-		.overlay {
-			if isGeneratingImages {
-				ZStack {
-					Color.black.opacity (0.4)
-						.ignoresSafeArea ()
-					
-					VStack (spacing: 16) {
-						ProgressView (value: generationProgress, total: 4.0) {
-							Text (generationStatus)
-								.font (.headline)
-						} currentValueLabel: {
-							Text ("\(Int(generationProgress))/4 variants generated")
-						}
-						.progressViewStyle (.linear)
-						.frame (width: 300)
-						
-						Text ("Please keep the application open. Enforcing rate-limits between API requests...")
-							.font (.caption)
-							.foregroundStyle (.secondary)
-							.multilineTextAlignment (.center)
+		.sheet (isPresented: $isShowingProgress) {
+			UMProgressSheetView (report: progressReport) {
+				activeTask?.cancel ()
+				isShowingProgress = false
+			}
+		}
+		.sheet (isPresented: $isShowingCreateShot) {
+			if let character = document.projectState.characters.first (where: { $0.id == scene.characterId }),
+			   let environment = document.projectState.environments.first (where: { $0.id == scene.environmentId }) {
+				THCreateShotSheet (
+					character: character,
+					environment: environment,
+					scene: scene,
+					onGenerate: { shotType, cameraSetup, characterPosition, cameraAngle, lensStyle, compositionNotes in
+						generateShots (
+							shotType: shotType,
+							cameraSetup: cameraSetup,
+							characterPosition: characterPosition,
+							cameraAngle: cameraAngle,
+							lensStyle: lensStyle,
+							compositionNotes: compositionNotes
+						)
 					}
-					.padding (24)
-					.background (.background)
-					.clipShape (RoundedRectangle (cornerRadius: 16))
-					.shadow (radius: 10)
-				}
-			} else if isAnalyzingAudio {
-				ZStack {
-					Color.black.opacity (0.4)
-						.ignoresSafeArea ()
-					
-					VStack (spacing: 16) {
-						ProgressView ()
-							.progressViewStyle (.circular)
-						
-						Text (analysisStatus)
-							.font (.headline)
-						
-						Text ("Analyzing audio file with CoreML Silero VAD...")
-							.font (.caption)
-							.foregroundStyle (.secondary)
-					}
-					.padding (24)
-					.background (.background)
-					.clipShape (RoundedRectangle (cornerRadius: 16))
-					.shadow (radius: 10)
-				}
+				)
 			}
 		}
 		.alert ("Generation Failed", isPresented: Binding<Bool>(
@@ -263,6 +257,7 @@ struct THSceneEditorView: View {
 					.controlSize (.small)
 				}
 			}
+			.frame (maxWidth: .infinity, alignment: .leading)
 		}
 	}
 
@@ -314,6 +309,7 @@ struct THSceneEditorView: View {
 					}
 				}
 			}
+			.frame (maxWidth: .infinity, alignment: .leading)
 		}
 	}
 
@@ -334,7 +330,7 @@ struct THSceneEditorView: View {
 					}
 
 					Button {
-						generateShots ()
+						isShowingCreateShot = true
 					} label: {
 						Label ("Generate Shots", systemImage: "sparkles")
 					}
@@ -349,16 +345,11 @@ struct THSceneEditorView: View {
 							.font (.body)
 					}
 					
-					let projectURL = NSDocumentController.shared.currentDocument?.fileURL
-					
 					THShotGalleryView (
 						shots: sceneShots,
-						projectURL: projectURL,
+						projectURL: resolvedProjectURL,
 						onApprove: { shotId, isApproved in
-							if let idx = document.projectState.shots.firstIndex (where: { $0.id == shotId }) {
-								document.projectState.shots [idx].isApproved = isApproved
-								scene.modifiedAt = Date ()
-							}
+							handleShotApproval (shotId: shotId, approve: isApproved)
 						},
 						onDelete: { shotId in
 							scene.shotIds.removeAll { $0 == shotId }
@@ -370,7 +361,7 @@ struct THSceneEditorView: View {
 					
 					HStack {
 						Button {
-							generateShots ()
+							isShowingCreateShot = true
 						} label: {
 							Label ("Generate More Shots", systemImage: "sparkles")
 						}
@@ -379,6 +370,7 @@ struct THSceneEditorView: View {
 					}
 				}
 			}
+			.frame (maxWidth: .infinity, alignment: .leading)
 		}
 	}
 
@@ -399,6 +391,14 @@ struct THSceneEditorView: View {
 							.foregroundStyle (.secondary)
 							.lineLimit (1)
 					}
+					
+					Button {
+						triggerVideoRender ()
+					} label: {
+						Label ("Re-render Video", systemImage: "arrow.clockwise")
+					}
+					.buttonStyle (.bordered)
+					.controlSize (.small)
 				} else {
 					HStack {
 						Image (systemName: "film")
@@ -408,15 +408,26 @@ struct THSceneEditorView: View {
 					}
 
 					Button {
-						// Phase 4: THVideoRenderer will handle this
+						triggerVideoRender ()
 					} label: {
 						Label ("Render Video", systemImage: "play.rectangle.fill")
 					}
 					.buttonStyle (.borderedProminent)
 					.controlSize (.small)
-					.disabled (true) // Enabled in Slice 4
+					.disabled (
+						scene.audioSequence == nil ||
+						scene.transcript == nil ||
+						!document.projectState.shots.contains (where: { scene.shotIds.contains ($0.id) && $0.isApproved })
+					)
+				}
+				
+				if let error = renderingError {
+					Text (error)
+						.font (.caption)
+						.foregroundStyle (.red)
 				}
 			}
+			.frame (maxWidth: .infinity, alignment: .leading)
 		}
 	}
 
@@ -426,7 +437,7 @@ struct THSceneEditorView: View {
 		let completedSteps = [
 			scene.audioSequence != nil,
 			scene.transcript != nil,
-			!scene.shotIds.isEmpty,
+			document.projectState.shots.contains (where: { scene.shotIds.contains ($0.id) && $0.isApproved }),
 			scene.renderedVideoPath != nil
 		].filter { $0 }.count
 
@@ -453,59 +464,77 @@ struct THSceneEditorView: View {
 		guard case .success (let urls) = result,
 			  let url = urls.first else { return }
 		
-		guard let currentDoc = NSDocumentController.shared.currentDocument,
-			  let projectURL = currentDoc.fileURL else {
+		guard let projectURL = resolvedProjectURL else {
 			// Save the project file first to have a valid path
 			return
 		}
 		
 		let gotAccess = url.startAccessingSecurityScopedResource ()
 		
-		isAnalyzingAudio = true
-		analysisStatus = "Importing audio file..."
+		isShowingProgress = true
+		progressReport = UMProgressReport (
+			gloablStatus: "Importing Audio File",
+			subStatus: "Copying audio file into project...",
+			percentage: 0.0
+		)
 		
-		Task {
+		let task = Task {
 			defer {
 				if gotAccess {
 					url.stopAccessingSecurityScopedResource ()
+				}
+				Task { @MainActor in
+					self.activeTask = nil
 				}
 			}
 			
 			do {
 				// Copy the audio file into the project bundle folder 'audio'
 				let relativePath = try THFileUtils.copyIntoProject (source: url, subdirectory: "audio", projectURL: projectURL)
+				if Task.isCancelled { return }
 				
 				// Resolve the copied absolute path to extract duration
 				let destURL = THFileUtils.resolveAssetPath (relativePath, projectURL: projectURL)
 				let asset = AVURLAsset (url: destURL)
 				let durationCMTime = try await asset.load (.duration)
+				if Task.isCancelled { return }
 				let seconds = CMTimeGetSeconds (durationCMTime)
 				let duration = seconds.isNaN ? 0.0 : seconds
 				
 				// 1. Resample audio
 				await MainActor.run {
-					analysisStatus = "Resampling audio to 16kHz..."
+					progressReport.subStatus = "Resampling audio to 16kHz..."
+					progressReport.percentage = 0.25
 				}
-				let converter = AudioConverter ()
-				let samples = try converter.resampleAudioFile (destURL)
+				let samples = try await Task.detached(priority: .userInitiated) {
+					let converter = AudioConverter ()
+					return try converter.resampleAudioFile (destURL)
+				}.value
+				if Task.isCancelled { return }
 				
 				// 2. Initialize VadManager
 				await MainActor.run {
-					analysisStatus = "Initializing VAD Model..."
+					progressReport.subStatus = "Initializing VAD Model..."
+					progressReport.percentage = 0.50
 				}
 				let vadManager = try await VadManager ()
+				if Task.isCancelled { return }
 				
 				// 3. Process VAD
 				await MainActor.run {
-					analysisStatus = "Running Voice Activity Detection..."
+					progressReport.subStatus = "Running Voice Activity Detection..."
+					progressReport.percentage = 0.75
 				}
 				let vadResults = try await vadManager.process (samples)
+				if Task.isCancelled { return }
 				
 				// 4. Segment Speech
 				await MainActor.run {
-					analysisStatus = "Segmenting speech clusters..."
+					progressReport.subStatus = "Segmenting speech clusters..."
+					progressReport.percentage = 0.90
 				}
 				let segments = await vadManager.segmentSpeech (from: vadResults, totalSamples: samples.count)
+				if Task.isCancelled { return }
 				
 				// Map FluidAudio's VadResult/VadSegment to our THAudioSegment and THSpeechCluster
 				var thSegments: [THAudioSegment] = []
@@ -544,114 +573,136 @@ struct THSceneEditorView: View {
 					scene.shotAssignments = []
 					scene.renderedVideoPath = nil
 					scene.modifiedAt = Date ()
-					isAnalyzingAudio = false
+					isShowingProgress = false
 				}
 			} catch {
 				await MainActor.run {
 					print ("Audio analysis failed: \(error.localizedDescription)")
-					isAnalyzingAudio = false
+					isShowingProgress = false
 				}
 			}
 		}
+		self.activeTask = task
 	}
 	
-	private func generateShots () {
+	private func generateShots (
+		shotType: THShotType,
+		cameraSetup: String,
+		characterPosition: String,
+		cameraAngle: String,
+		lensStyle: String,
+		compositionNotes: String
+	) {
 		guard let character = document.projectState.characters.first (where: { $0.id == scene.characterId }),
 			  let environment = document.projectState.environments.first (where: { $0.id == scene.environmentId })
 		else { return }
 		
-		isGeneratingImages = true
-		generationProgress = 0.0
-		generationStatus = "Initializing AI Image Models..."
+		isShowingProgress = true
+		progressReport = UMProgressReport (
+			gloablStatus: "Generating AI Test Shot",
+			subStatus: "Initializing AI Image Models...",
+			percentage: 0.0
+		)
 		generationError = nil
 		
-		Task {
+		let task = Task {
+			defer {
+				Task { @MainActor in
+					self.activeTask = nil
+				}
+			}
 			do {
-				// We'll generate shots inside the temporary working directory of this document bundle
-				// We can obtain the package path if we are sandbox-compliant.
-				// For the UI, we retrieve the fileURL through NSDocument.
-				// Since we do not have direct document URL in fileWrapper easily, we can find it
-				// through NSDocumentController shared.
-				guard let currentDoc = NSDocumentController.shared.currentDocument,
-					  let projectURL = currentDoc.fileURL else {
+				guard let projectURL = resolvedProjectURL else {
 					throw NSError (domain: "THSceneEditorView", code: 404, userInfo: [NSLocalizedDescriptionKey: "Save the project file first before generating shots."])
 				}
 				
 				let generator = THImageGenerator ()
 				
-				// Generate 1 shot with 4 variants for demonstration
-				let newVariants = try await generator.generateVariants (
-					for: character,
-					in: environment,
-					shotType: .mediumCloseUp,
-					aspectRatio: scene.aspectRatio,
-					characterPosition: scene.characterPosition,
-					cameraSetup: scene.cameraSetup,
-					projectURL: projectURL
-				) { step in
-					Task { @MainActor in
-						self.generationProgress = Double (step)
-						switch step {
-						case 1:
-							self.generationStatus = "Generated Base Pose (Neutrale)..."
-						case 2:
-							self.generationStatus = "Generated Variant 2 (Bocca Aperta)..."
-						case 3:
-							self.generationStatus = "Generated Variant 3 (Occhi Chiusi)..."
-						case 4:
-							self.generationStatus = "Generated Variant 4 (Mouth Open / Eyes Closed)..."
-						default:
-							break
-						}
-					}
+				await MainActor.run {
+					self.progressReport.percentage = 0.5
+					self.progressReport.subStatus = "Generating character test in environment..."
 				}
 				
+				let basePath = try await generator.generateBaseVariant (
+					for: character,
+					in: environment,
+					shotType: shotType,
+					aspectRatio: scene.aspectRatio,
+					characterPosition: characterPosition,
+					cameraSetup: cameraSetup,
+					projectURL: projectURL
+				)
+				if Task.isCancelled { return }
+				
 				await MainActor.run {
+					let newVariants = THShotVariants (
+						mouthClosedEyesOpen: basePath,
+						mouthOpenEyesOpen: nil,
+						mouthClosedEyesClosed: nil,
+						mouthOpenEyesClosed: nil
+					)
+					
 					let newShot = THShot (
 						characterId: character.id,
 						environmentId: environment.id,
-						shotType: .mediumCloseUp,
+						shotType: shotType,
+						cameraAngle: cameraAngle,
+						lensStyle: lensStyle,
+						compositionNotes: compositionNotes,
+						cameraSetup: cameraSetup,
+						characterPosition: characterPosition,
 						promptUsed: "Generated using UMGeminiLib NanoBananaPro",
 						variants: newVariants,
-						isApproved: true
+						isApproved: false
 					)
 					
 					document.projectState.shots.append (newShot)
 					scene.shotIds.append (newShot.id)
-					isGeneratingImages = false
+					isShowingProgress = false
 				}
 				
 			} catch {
 				await MainActor.run {
 					self.generationError = error.localizedDescription
-					self.isGeneratingImages = false
+					isShowingProgress = false
 				}
 			}
 		}
+		self.activeTask = task
 	}
 	
 	private func runTranscription () {
 		guard let audioSeq = scene.audioSequence else { return }
 		
-		guard let currentDoc = NSDocumentController.shared.currentDocument,
-			  let projectURL = currentDoc.fileURL else {
+		guard let projectURL = resolvedProjectURL else {
 			return
 		}
 		
 		let audioURL = THFileUtils.resolveAssetPath (audioSeq.audioFilePath, projectURL: projectURL)
 		
-		isAnalyzingAudio = true
-		analysisStatus = "Initializing ASR models..."
+		isShowingProgress = true
+		progressReport = UMProgressReport (
+			gloablStatus: "Running Transcription",
+			subStatus: "Initializing ASR models...",
+			percentage: 0.0
+		)
 		
-		Task {
+		let task = Task {
+			defer {
+				Task { @MainActor in
+					self.activeTask = nil
+				}
+			}
 			do {
 				// 1. Download and load ASR models (tdtCtc110m is compact and runs perfectly)
 				let models = try await AsrModels.downloadAndLoad (
 					version: .tdtCtc110m
 				)
+				if Task.isCancelled { return }
 				
 				await MainActor.run {
-					analysisStatus = "Transcribing audio content..."
+					progressReport.subStatus = "Transcribing audio content..."
+					progressReport.percentage = 0.50
 				}
 				
 				// 2. Transcribe
@@ -659,27 +710,31 @@ struct THSceneEditorView: View {
 				var decoderState = TdtDecoderState.make (decoderLayers: models.version.decoderLayers)
 				
 				let asrResult = try await asrManager.transcribe (audioURL, decoderState: &decoderState)
+				if Task.isCancelled { return }
 				
 				await MainActor.run {
-					analysisStatus = "Segmenting text into sentences..."
+					progressReport.subStatus = "Segmenting text into sentences..."
+					progressReport.percentage = 0.90
 				}
 				
 				// 3. Segment into sentences
 				let tokenTimings = asrResult.tokenTimings ?? []
 				let transcript = segmentTranscript (from: tokenTimings, fallbackText: asrResult.text)
+				if Task.isCancelled { return }
 				
 				await MainActor.run {
 					scene.transcript = transcript
 					scene.modifiedAt = Date ()
-					isAnalyzingAudio = false
+					isShowingProgress = false
 				}
 			} catch {
 				await MainActor.run {
 					print ("Transcription failed: \(error.localizedDescription)")
-					isAnalyzingAudio = false
+					isShowingProgress = false
 				}
 			}
 		}
+		self.activeTask = task
 	}
 	
 	private func segmentTranscript (from timings: [TokenTiming], fallbackText: String) -> THTranscript {
@@ -771,5 +826,148 @@ struct THSceneEditorView: View {
 		
 		let fullText = sentences.map { $0.text }.joined (separator: " ")
 		return THTranscript (fullText: fullText, sentences: sentences)
+	}
+
+	private func triggerVideoRender () {
+		guard let projectURL = resolvedProjectURL else {
+			renderingError = "Please save the project file first before rendering video."
+			return
+		}
+		
+		isShowingProgress = true
+		progressReport = UMProgressReport (
+			gloablStatus: "Exporting Video",
+			subStatus: "Composing video timeline...",
+			percentage: 0.0
+		)
+		renderingError = nil
+		
+		let task = Task {
+			defer {
+				Task { @MainActor in
+					self.activeTask = nil
+				}
+			}
+			do {
+				let renderer = THVideoRenderer ()
+				let relativeVideoPath = try await renderer.render (
+					scene: scene,
+					projectURL: projectURL,
+					shots: document.projectState.shots
+				) { progressVal in
+					Task { @MainActor in
+						self.progressReport.percentage = progressVal
+						self.progressReport.subStatus = "Exporting frame \(Int(progressVal * 100))%"
+					}
+				}
+				if Task.isCancelled { return }
+				
+				await MainActor.run {
+					scene.renderedVideoPath = relativeVideoPath
+					scene.modifiedAt = Date ()
+					isShowingProgress = false
+				}
+			} catch {
+				await MainActor.run {
+					renderingError = error.localizedDescription
+					isShowingProgress = false
+				}
+			}
+		}
+		self.activeTask = task
+	}
+	
+	private func handleShotApproval (shotId: UUID, approve: Bool) {
+		guard let idx = document.projectState.shots.firstIndex (where: { $0.id == shotId }) else { return }
+		let shot = document.projectState.shots [idx]
+		
+		if !approve {
+			// Revoke approval
+			document.projectState.shots [idx].isApproved = false
+			scene.modifiedAt = Date ()
+			return
+		}
+		
+		// If variants are already complete, simply approve the shot
+		if shot.variants.isComplete {
+			document.projectState.shots [idx].isApproved = true
+			scene.modifiedAt = Date ()
+			return
+		}
+		
+		// Otherwise, generate the remaining 3 animatable variants using Image-to-Image
+		guard let character = document.projectState.characters.first (where: { $0.id == shot.characterId }),
+			  let environment = document.projectState.environments.first (where: { $0.id == shot.environmentId })
+		else { return }
+		
+		isShowingProgress = true
+		progressReport = UMProgressReport (
+			gloablStatus: "Generating Animatable Variants",
+			subStatus: "Initializing AI Image Models...",
+			percentage: 0.0
+		)
+		generationError = nil
+		
+		let task = Task {
+			defer {
+				Task { @MainActor in
+					self.activeTask = nil
+				}
+			}
+			do {
+				guard let projectURL = resolvedProjectURL else {
+					throw NSError (domain: "THSceneEditorView", code: 404, userInfo: [NSLocalizedDescriptionKey: "Save the project file first before generating variants."])
+				}
+				
+				guard let baseImagePath = shot.variants.mouthClosedEyesOpen else {
+					throw NSError (domain: "THSceneEditorView", code: 400, userInfo: [NSLocalizedDescriptionKey: "Base shot is missing."])
+				}
+				
+				let generator = THImageGenerator ()
+				
+				let updatedVariants = try await generator.generateRemainingVariants (
+					baseImagePath: baseImagePath,
+					for: character,
+					in: environment,
+					shotType: shot.shotType,
+					aspectRatio: scene.aspectRatio,
+					characterPosition: shot.characterPosition,
+					cameraSetup: shot.cameraSetup,
+					projectURL: projectURL
+				) { step in
+					Task { @MainActor in
+						self.progressReport.percentage = Double (step) / 3.0
+						switch step {
+						case 1:
+							self.progressReport.subStatus = "Generated Variant 2 (Bocca Aperta)..."
+						case 2:
+							self.progressReport.subStatus = "Generated Variant 3 (Occhi Chiusi)..."
+						case 3:
+							self.progressReport.subStatus = "Generated Variant 4 (Mouth Open / Eyes Closed)..."
+						default:
+							break
+						}
+					}
+				}
+				
+				if Task.isCancelled { return }
+				
+				await MainActor.run {
+					if let shotIdx = document.projectState.shots.firstIndex (where: { $0.id == shotId }) {
+						document.projectState.shots [shotIdx].variants = updatedVariants
+						document.projectState.shots [shotIdx].isApproved = true
+						scene.modifiedAt = Date ()
+					}
+					isShowingProgress = false
+				}
+				
+			} catch {
+				await MainActor.run {
+					self.generationError = error.localizedDescription
+					isShowingProgress = false
+				}
+			}
+		}
+		self.activeTask = task
 	}
 }

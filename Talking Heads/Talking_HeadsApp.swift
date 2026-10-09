@@ -11,7 +11,7 @@ import SwiftUI
 struct Talking_HeadsApp: App {
 	var body: some Scene {
 		DocumentGroup (newDocument: Talking_HeadsDocument ()) { file in
-			ContentView (document: file.$document)
+			ContentView (document: file.$document, projectURL: file.fileURL)
 		}
 		.commands {
 			// Remove default "New Window" command

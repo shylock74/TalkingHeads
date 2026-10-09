@@ -8,6 +8,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import UMUIControls
+import AppKit
 
 // MARK: - Character Editor View
 
@@ -16,6 +17,11 @@ import UMUIControls
 struct THCharacterEditorView: View {
 	@Binding var character: THCharacter
 	@State private var isImportingImages = false
+	@State private var selectedImagePathForZoom: String? = nil
+
+	private var projectURL: URL? {
+		NSDocumentController.shared.currentDocument?.fileURL
+	}
 
 	var body: some View {
 		ScrollView {
@@ -36,6 +42,14 @@ struct THCharacterEditorView: View {
 			allowsMultipleSelection: true
 		) { result in
 			handleImageImport (result)
+		}
+		.sheet (isPresented: Binding<Bool> (
+			get: { selectedImagePathForZoom != nil },
+			set: { if !$0 { selectedImagePathForZoom = nil } }
+		)) {
+			if let path = selectedImagePathForZoom {
+				THImageZoomSheet (imagePath: path, projectURL: projectURL)
+			}
 		}
 	}
 
@@ -153,7 +167,17 @@ struct THCharacterEditorView: View {
 				.frame (width: 80, height: 80)
 
 			// Attempt to load the image
-			if let nsImage = NSImage (contentsOfFile: path) {
+			let resolvedURL: URL = {
+				if path.hasPrefix ("/") {
+					return URL (fileURLWithPath: path)
+				} else if let projectURL = projectURL {
+					return THFileUtils.resolveAssetPath (path, projectURL: projectURL)
+				} else {
+					return URL (fileURLWithPath: path)
+				}
+			}()
+
+			if let nsImage = NSImage (contentsOf: resolvedURL) {
 				Image (nsImage: nsImage)
 					.resizable ()
 					.aspectRatio (contentMode: .fill)
@@ -163,6 +187,10 @@ struct THCharacterEditorView: View {
 				Image (systemName: "photo")
 					.foregroundStyle (.quaternary)
 			}
+		}
+		.contentShape (Rectangle ())
+		.onTapGesture {
+			selectedImagePathForZoom = path
 		}
 		.overlay (alignment: .topTrailing) {
 			Button {
@@ -182,9 +210,24 @@ struct THCharacterEditorView: View {
 	private func handleImageImport (_ result: Result<[URL], Error>) {
 		guard case .success (let urls) = result else { return }
 		for url in urls {
-			// For now, store the absolute path.
-			// In Phase 3, THAssetManager will copy into the project directory and store relative paths.
-			character.referenceImagePaths.append (url.path)
+			let gotAccess = url.startAccessingSecurityScopedResource ()
+			
+			if let projectURL = projectURL {
+				do {
+					try THFileUtils.ensureDirectoryStructure (at: projectURL)
+					let relativePath = try THFileUtils.copyIntoProject (source: url, subdirectory: "characters", projectURL: projectURL)
+					character.referenceImagePaths.append (relativePath)
+				} catch {
+					print ("Error copying image to project: \(error)")
+					character.referenceImagePaths.append (url.path)
+				}
+			} else {
+				character.referenceImagePaths.append (url.path)
+			}
+			
+			if gotAccess {
+				url.stopAccessingSecurityScopedResource ()
+			}
 		}
 		character.modifiedAt = Date ()
 	}

@@ -9,12 +9,13 @@ import SwiftUI
 
 struct ContentView: View {
 	@Binding var document: Talking_HeadsDocument
+	let projectURL: URL?
 
 	var body: some View {
-		THMainView (document: $document)
+		THMainView (document: $document, projectURL: projectURL)
 	}
 }
 
 #Preview {
-	ContentView (document: .constant (Talking_HeadsDocument ()))
+	ContentView (document: .constant (Talking_HeadsDocument ()), projectURL: nil)
 }

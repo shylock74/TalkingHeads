@@ -15,6 +15,7 @@ import SwiftUI
 /// - Detail: editor for selected item
 struct THMainView: View {
 	@Binding var document: Talking_HeadsDocument
+	let projectURL: URL?
 
 	@State private var selectedSection: THSidebarSection = .characters
 	@State private var selectedCharacterId: UUID?
@@ -78,6 +79,7 @@ struct THMainView: View {
 				scenes: $document.projectState.scenes,
 				characters: document.projectState.characters,
 				environments: document.projectState.environments,
+				shots: document.projectState.shots,
 				selectedId: $selectedSceneId
 			)
 		}
@@ -113,7 +115,8 @@ struct THMainView: View {
 			   let index = document.projectState.scenes.firstIndex (where: { $0.id == selectedId }) {
 				THSceneEditorView (
 					scene: $document.projectState.scenes [index],
-					document: $document
+					document: $document,
+					projectURL: projectURL
 				)
 			} else {
 				emptyDetailView (message: "Select a scene to edit")

@@ -15,6 +15,7 @@ struct THSceneListView: View {
 	@Binding var scenes: [THScene]
 	let characters: [THCharacter]
 	let environments: [THEnvironment]
+	let shots: [THShot]
 	@Binding var selectedId: UUID?
 
 	@State private var showingNewSceneSheet = false
@@ -102,7 +103,7 @@ struct THSceneListView: View {
 				statusBadge (
 					icon: "camera",
 					label: "Shots",
-					isComplete: !scene.shotIds.isEmpty
+					isComplete: shots.contains (where: { scene.shotIds.contains ($0.id) && $0.isApproved })
 				)
 				statusBadge (
 					icon: "film",
